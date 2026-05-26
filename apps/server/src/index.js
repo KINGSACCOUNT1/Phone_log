@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const multer = require("multer");
+const { toFile } = require("openai/uploads");
 
 const { getVoicePreset, buildSystemPrompt } = require("./character");
 const { createOpenAIClient } = require("./openaiClient");
@@ -44,9 +45,13 @@ app.post("/api/session/turn", upload.single("audio"), async (req, res) => {
     let transcript = userTextFallback;
     if (!transcript && audioFile && openai) {
       const transcription = await openai.audio.transcriptions.create({
-        file: new File([audioFile.buffer], audioFile.originalname || "speech.m4a", {
-          type: audioFile.mimetype || "audio/m4a",
-        }),
+        file: await toFile(
+          audioFile.buffer,
+          audioFile.originalname || "speech.m4a",
+          {
+            type: audioFile.mimetype || "audio/m4a",
+          }
+        ),
         model: "gpt-4o-mini-transcribe",
       });
       transcript = transcription.text;
