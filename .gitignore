@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+npm-debug.log*
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/web-build/
+apps/server/uploads/
