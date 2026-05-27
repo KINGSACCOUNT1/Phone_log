@@ -332,8 +332,8 @@ def import_from_csv(csv_content: str, data_file: Optional[str] = None) -> Dict[s
             )
             imported += 1
             
-        except Exception as e:
-            errors.append(f"Row {row_num}: {str(e)}")
+        except Exception:
+            errors.append(f"Row {row_num}: Failed to import record")
     
     return {
         "imported": imported,
