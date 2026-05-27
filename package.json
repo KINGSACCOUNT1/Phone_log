@@ -1,0 +1,17 @@
+{
+  "name": "phone-log",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/mobile",
+    "apps/server"
+  ],
+  "scripts": {
+    "dev:server": "npm --workspace apps/server run dev",
+    "dev:mobile": "npm --workspace apps/mobile run start",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:mobile\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
