@@ -1,0 +1,235 @@
+openapi: 3.0.3
+info:
+  title: Phone Log API
+  description: |
+    RESTful API for managing phone call records with voice assistant capabilities.
+    
+    ## Features
+    - CRUD operations for call records
+    - Voice assistant chat interface
+    - Analytics and statistics
+    - Export/Import functionality
+    - Customizable assistant personas
+    - Voice configuration and cloning support
+    
+  version: 1.0.0
+  contact:
+    name: Phone Log Support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+  - url: https://phone-log.onrender.com
+    description: Production server
+
+tags:
+  - name: Chat
+    description: Voice assistant chat operations
+  - name: Calls
+    description: Phone call record management
+  - name: Identity
+    description: Assistant identity customization
+  - name: Personas
+    description: Predefined assistant personas
+  - name: Voice
+    description: Voice configuration and cloning
+  - name: Analytics
+    description: Call statistics and analytics
+  - name: Export
+    description: Data export and import operations
+  - name: Backup
+    description: Backup and restore functionality
+
+paths:
+  /api/chat:
+    post:
+      tags: [Chat]
+      summary: Send a message to the voice assistant
+      description: Process natural language input and return assistant response with reasoning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  description: User's message or voice command
+                  example: "Show my calls"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: Bad request (empty message)
+
+  /api/calls:
+    get:
+      tags: [Calls]
+      summary: List all call records
+      parameters:
+        - name: direction
+          in: query
+          description: Filter by call direction
+          schema:
+            type: string
+            enum: [incoming, outgoing, missed]
+      responses:
+        '200':
+          description: List of call records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Call'
+    
+    post:
+      tags: [Calls]
+      summary: Add a new call record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallInput'
+      responses:
+        '201':
+          description: Call record created
+        '400':
+          description: Invalid call data
+
+  /api/calls/{call_id}:
+    delete:
+      tags: [Calls]
+      summary: Delete a call record
+      parameters:
+        - name: call_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Call deleted successfully
+        '404':
+          description: Call not found
+
+  /api/analytics/stats:
+    get:
+      tags: [Analytics]
+      summary: Get comprehensive call statistics
+      responses:
+        '200':
+          description: Call statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallStatistics'
+
+  /api/export/csv:
+    get:
+      tags: [Export]
+      summary: Export call records as CSV
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+
+  /api/backup:
+    get:
+      tags: [Backup]
+      summary: Create a full backup
+      responses:
+        '200':
+          description: Backup JSON file
+
+  /api/restore:
+    post:
+      tags: [Backup]
+      summary: Restore from backup
+      responses:
+        '200':
+          description: Restore successful
+        '400':
+          description: Restore failed
+
+components:
+  schemas:
+    Call:
+      type: object
+      properties:
+        id:
+          type: integer
+        contact_name:
+          type: string
+        phone_number:
+          type: string
+        direction:
+          type: string
+          enum: [incoming, outgoing, missed]
+        timestamp:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+
+    CallInput:
+      type: object
+      required: [contact_name, phone_number, direction]
+      properties:
+        contact_name:
+          type: string
+        phone_number:
+          type: string
+        direction:
+          type: string
+          enum: [incoming, outgoing, missed]
+        duration_seconds:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+
+    ChatResponse:
+      type: object
+      properties:
+        reasoning:
+          type: string
+        response:
+          type: string
+        action_taken:
+          type: string
+        data:
+          description: Any relevant data retrieved
+
+    CallStatistics:
+      type: object
+      properties:
+        total_calls:
+          type: integer
+        incoming:
+          type: integer
+        outgoing:
+          type: integer
+        missed:
+          type: integer
+        total_duration_seconds:
+          type: integer
+        average_duration_seconds:
+          type: number

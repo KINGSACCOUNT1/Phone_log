@@ -1,0 +1,24 @@
+# Render Blueprint Configuration
+# Deploy to Render: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: phone-log
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn web_app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: DATA_DIR
+        value: /data  # must match disk.mountPath below
+      - key: ELEVENLABS_API_KEY
+        sync: false
+    healthCheckPath: /
+    disk:
+      name: phone-log-data
+      mountPath: /data
+      sizeGB: 1
