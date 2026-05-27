@@ -17,6 +17,9 @@ This project is designed for realistic synthetic character voices (male/female s
 - Push-to-talk input from mobile
 - Character selection (female/male presets)
 - Speech-to-speech response loop
+- Session memory per conversation id (short rolling history)
+- Playback interruption when user starts speaking again
+- URL-based audio playback for lower response latency on mobile
 - Local fallback mode when no API key is configured
 - Safety prompting to avoid identity impersonation
 
@@ -72,11 +75,17 @@ Form fields:
   - gender (woman or man)
 
 Response:
+- sessionId
 - transcript
 - replyText
 - audioBase64 (null in fallback mode)
+- audioUrl (temporary streaming-friendly URL when TTS is enabled)
 - mimeType
 - usedVoice
+
+Extra endpoints:
+- GET /api/audio/:audioId (temporary audio file, 5 minute TTL)
+- GET /api/session/:sessionId/history (debug conversation memory)
 
 ## Safety
 

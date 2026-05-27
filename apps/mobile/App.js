@@ -1,7 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -30,12 +30,15 @@ const CHARACTERS = [
 ];
 
 export default function App() {
+  const sessionId = useMemo(() => `session-${Date.now()}-${Math.floor(Math.random() * 1e6)}`, []);
+  const soundRef = useRef(null);
   const [character, setCharacter] = useState(CHARACTERS[0]);
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("Tap and hold to speak.");
+  const [sessionLabel, setSessionLabel] = useState(sessionId);
   const [error, setError] = useState("");
 
   const statusText = useMemo(() => {
@@ -47,6 +50,8 @@ export default function App() {
   async function startRecording() {
     try {
       setError("");
+      await stopCurrentPlayback();
+
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
         setError("Microphone permission is required.");
@@ -96,6 +101,7 @@ export default function App() {
           gender: character.gender,
         })
       );
+      formData.append("sessionId", sessionId);
 
       const response = await fetch(`${API_BASE_URL}/api/session/turn`, {
         method: "POST",
@@ -109,8 +115,11 @@ export default function App() {
 
       setTranscript(data.transcript || "");
       setReply(data.replyText || "No response text returned.");
+      setSessionLabel(data.sessionId || sessionId);
 
-      if (data.audioBase64) {
+      if (data.audioUrl) {
+        await playRemoteAudio(`${API_BASE_URL}${data.audioUrl}`);
+      } else if (data.audioBase64) {
         await playBase64Audio(data.audioBase64, data.mimeType || "audio/mpeg");
       }
     } catch (e) {
@@ -120,7 +129,30 @@ export default function App() {
     }
   }
 
+  async function stopCurrentPlayback() {
+    if (!soundRef.current) {
+      return;
+    }
+
+    try {
+      await soundRef.current.stopAsync();
+      await soundRef.current.unloadAsync();
+    } catch (_error) {
+      // Ignore cleanup issues when interrupting playback.
+    }
+
+    soundRef.current = null;
+  }
+
+  async function playRemoteAudio(uri) {
+    await stopCurrentPlayback();
+    const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
+    soundRef.current = sound;
+  }
+
   async function playBase64Audio(audioBase64, mimeType) {
+    await stopCurrentPlayback();
+
     const extension = mimeType.includes("mpeg") ? "mp3" : "m4a";
     const fileUri = `${FileSystem.cacheDirectory}reply.${extension}`;
 
@@ -128,8 +160,8 @@ export default function App() {
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    const { sound } = await Audio.Sound.createAsync({ uri: fileUri });
-    await sound.playAsync();
+    const { sound } = await Audio.Sound.createAsync({ uri: fileUri }, { shouldPlay: true });
+    soundRef.current = sound;
   }
 
   return (
@@ -141,6 +173,7 @@ export default function App() {
         <Text style={styles.subtitle}>
           Synthetic conversational voices only. Do not impersonate real identities.
         </Text>
+        <Text style={styles.sessionText}>Session: {sessionLabel}</Text>
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Choose a voice</Text>
@@ -219,6 +252,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     color: "#4d3726",
+  },
+  sessionText: {
+    fontSize: 12,
+    color: "#7a5d4a",
+    marginTop: -6,
   },
   card: {
     borderWidth: 1,
