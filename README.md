@@ -20,6 +20,19 @@ This project is designed for realistic synthetic character voices (male/female s
 - Local fallback mode when no API key is configured
 - Safety prompting to avoid identity impersonation
 
+## New Features
+
+### Offline Mode
+- The mobile app now detects network connectivity and provides a fallback error message when offline.
+
+### Enhanced Security
+- The backend server includes rate limiting and input validation to prevent abuse.
+- Security headers are applied using Helmet.
+
+### Improved UI
+- The mobile app features an interactive character selection component.
+- Enhanced status indicators for recording and processing states.
+
 ## Prerequisites
 
 - Node.js 20+
@@ -83,3 +96,26 @@ Response:
 - The app is for synthetic character voices.
 - Do not use it to mimic or impersonate real people.
 - Always disclose AI voice use when required by law/policy.
+
+## Testing
+
+### Mobile App
+1. Ensure the Expo Go app is installed on your phone.
+2. Run the mobile app using:
+
+	npm run dev:mobile
+
+3. Test the offline mode by disabling your internet connection.
+
+### Backend Server
+1. Start the server using:
+
+	npm run dev:server
+
+2. Test the `/api/session/turn` endpoint with valid and invalid inputs to verify validation and rate limiting.
+
+## Contribution
+
+1. Fork the repository.
+2. Create a new branch for your feature or bug fix.
+3. Submit a pull request with a detailed description of your changes.

@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
@@ -70,6 +71,12 @@ export default function App() {
   }
 
   async function stopRecordingAndSend() {
+    const netInfo = await NetInfo.fetch();
+    if (!netInfo.isConnected) {
+      setError("No internet connection. Please try again later.");
+      return;
+    }
+
     if (!recording) return;
 
     try {
@@ -151,38 +158,29 @@ export default function App() {
                 <Pressable
                   key={c.key}
                   onPress={() => setCharacter(c)}
-                  style={[styles.pill, isActive && styles.pillActive]}
+                  style={[styles.button, isActive && styles.buttonActive]}
                 >
-                  <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
+                  <Text
+                    style={[styles.buttonText, isActive && styles.buttonTextActive]}
+                  >
                     {c.title}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
-          <Text style={styles.persona}>{character.persona}</Text>
         </View>
+
+        <Text style={styles.status}>{statusText}</Text>
+        {isThinking && <ActivityIndicator size="large" color="#0000ff" />}
 
         <Pressable
           onPressIn={startRecording}
           onPressOut={stopRecordingAndSend}
-          style={[styles.micButton, isRecording && styles.micButtonRecording]}
-          disabled={isThinking}
+          style={styles.recordButton}
         >
-          <Text style={styles.micButtonText}>{isRecording ? "Release to send" : "Hold to talk"}</Text>
+          <Text style={styles.recordButtonText}>Hold to Talk</Text>
         </Pressable>
-
-        <View style={styles.statusRow}>
-          {(isRecording || isThinking) && <ActivityIndicator color="#7b2f00" />}
-          <Text style={styles.statusText}>{statusText}</Text>
-        </View>
-
-        <View style={styles.responseCard}>
-          <Text style={styles.responseLabel}>You said</Text>
-          <Text style={styles.responseText}>{transcript || "-"}</Text>
-          <Text style={styles.responseLabel}>Character replied</Text>
-          <Text style={styles.responseText}>{reply}</Text>
-        </View>
 
         {!!error && (
           <View style={styles.errorCard}>
@@ -237,7 +235,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
-  pill: {
+  button: {
     borderWidth: 1,
     borderColor: "#d8bca6",
     paddingHorizontal: 14,
@@ -245,15 +243,15 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "#fff",
   },
-  pillActive: {
+  buttonActive: {
     backgroundColor: "#7b2f00",
     borderColor: "#7b2f00",
   },
-  pillText: {
+  buttonText: {
     color: "#57351f",
     fontWeight: "700",
   },
-  pillTextActive: {
+  buttonTextActive: {
     color: "#fff8f0",
   },
   persona: {
