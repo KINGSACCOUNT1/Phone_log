@@ -1,11 +1,13 @@
 """Phone Log Web Application - Flask-based web interface with voice assistant."""
 
 import json
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 
 import phone_log
 import assistant
 import voice_config
+import analytics
+import export
 
 app = Flask(__name__)
 
@@ -203,6 +205,176 @@ def api_set_elevenlabs():
         voice_id=data.get("voice_id"),
     )
     return jsonify({"success": True, "message": "ElevenLabs configuration updated"})
+
+
+# ─── Analytics Endpoints ───────────────────────────────────────────────────────
+
+@app.route("/api/analytics/stats", methods=["GET"])
+def api_get_statistics():
+    """Get comprehensive call statistics."""
+    stats = analytics.get_call_statistics()
+    return jsonify(stats)
+
+
+@app.route("/api/analytics/daily", methods=["GET"])
+def api_get_daily_stats():
+    """Get daily call statistics."""
+    days = request.args.get("days", 30, type=int)
+    data = analytics.get_calls_per_day(days)
+    return jsonify(data)
+
+
+@app.route("/api/analytics/contacts", methods=["GET"])
+def api_get_contact_summary():
+    """Get contact summary statistics."""
+    data = analytics.get_contact_summary()
+    return jsonify(data)
+
+
+@app.route("/api/analytics/hourly", methods=["GET"])
+def api_get_hourly_distribution():
+    """Get hourly call distribution."""
+    data = analytics.get_hourly_distribution()
+    return jsonify(data)
+
+
+@app.route("/api/analytics/weekly", methods=["GET"])
+def api_get_weekly_trends():
+    """Get weekly call trends."""
+    weeks = request.args.get("weeks", 4, type=int)
+    data = analytics.get_weekly_trends(weeks)
+    return jsonify(data)
+
+
+@app.route("/api/analytics/duration-distribution", methods=["GET"])
+def api_get_duration_distribution():
+    """Get call duration distribution."""
+    data = analytics.get_call_duration_distribution()
+    return jsonify(data)
+
+
+# ─── Export Endpoints ──────────────────────────────────────────────────────────
+
+@app.route("/api/export/csv", methods=["GET"])
+def api_export_csv():
+    """Export call records as CSV."""
+    csv_content = export.export_to_csv()
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=phone_log.csv"}
+    )
+
+
+@app.route("/api/export/json", methods=["GET"])
+def api_export_json():
+    """Export call records as JSON."""
+    json_content = export.export_to_json()
+    return Response(
+        json_content,
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=phone_log.json"}
+    )
+
+
+@app.route("/api/export/html", methods=["GET"])
+def api_export_html():
+    """Export call records as HTML report."""
+    html_content = export.export_to_html()
+    return Response(
+        html_content,
+        mimetype="text/html",
+        headers={"Content-Disposition": "attachment; filename=phone_log.html"}
+    )
+
+
+@app.route("/api/export/report", methods=["GET"])
+def api_generate_report():
+    """Generate a text summary report."""
+    report = export.generate_summary_report()
+    return Response(
+        report,
+        mimetype="text/plain",
+        headers={"Content-Disposition": "attachment; filename=phone_log_report.txt"}
+    )
+
+
+@app.route("/api/import/csv", methods=["POST"])
+def api_import_csv():
+    """Import call records from CSV."""
+    if "file" not in request.files:
+        data = request.get_json()
+        if data and "content" in data:
+            csv_content = data["content"]
+        else:
+            return jsonify({"error": "No file or content provided"}), 400
+    else:
+        file = request.files["file"]
+        csv_content = file.read().decode("utf-8")
+    
+    result = export.import_from_csv(csv_content)
+    return jsonify(result)
+
+
+# ─── Backup and Restore Endpoints ──────────────────────────────────────────────
+
+@app.route("/api/backup", methods=["GET"])
+def api_backup():
+    """Create a full backup of all data."""
+    calls = phone_log.get_all()
+    identity = assistant.load_identity()
+    voice_cfg = voice_config.load_voice_config()
+    
+    backup_data = {
+        "version": "1.0",
+        "timestamp": import_datetime().isoformat(),
+        "calls": calls,
+        "identity": identity,
+        "voice_config": voice_cfg,
+    }
+    
+    return Response(
+        json.dumps(backup_data, indent=2),
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=phone_log_backup.json"}
+    )
+
+
+@app.route("/api/restore", methods=["POST"])
+def api_restore():
+    """Restore data from a backup."""
+    if "file" not in request.files:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No backup data provided"}), 400
+        backup_data = data
+    else:
+        file = request.files["file"]
+        backup_data = json.loads(file.read().decode("utf-8"))
+    
+    try:
+        # Restore calls
+        if "calls" in backup_data:
+            # Clear existing and restore
+            phone_log._save(backup_data["calls"])
+        
+        # Restore identity
+        if "identity" in backup_data:
+            assistant.save_identity(backup_data["identity"])
+        
+        # Restore voice config
+        if "voice_config" in backup_data:
+            voice_config.save_voice_config(backup_data["voice_config"])
+        
+        return jsonify({"success": True, "message": "Backup restored successfully"})
+    except Exception as e:
+        return jsonify({"error": f"Restore failed: {str(e)}"}), 400
+
+
+def import_datetime():
+    """Import datetime.datetime to avoid circular imports."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
 
 
 # ─── Main Entry Point ──────────────────────────────────────────────────────────
