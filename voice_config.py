@@ -11,7 +11,8 @@ import re
 
 # ─── Configuration File ────────────────────────────────────────────────────────
 
-VOICE_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voice_config.json")
+_DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
+VOICE_CONFIG_FILE = os.path.join(_DATA_DIR, "voice_config.json")
 
 DEFAULT_VOICE_CONFIG = {
     "tts_provider": "browser",  # Options: "browser", "elevenlabs", "custom"

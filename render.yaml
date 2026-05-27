@@ -5,6 +5,7 @@ services:
   - type: web
     name: phone-log
     runtime: python
+    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn web_app:app --bind 0.0.0.0:$PORT
     envVars:
@@ -12,4 +13,10 @@ services:
         value: "3.11"
       - key: FLASK_DEBUG
         value: "false"
+      - key: DATA_DIR
+        value: /data
     healthCheckPath: /
+    disk:
+      name: phone-log-data
+      mountPath: /data
+      sizeGB: 1

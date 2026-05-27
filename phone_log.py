@@ -4,7 +4,8 @@ import json
 import os
 from datetime import datetime, timezone
 
-DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "call_log.json")
+_DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
+DATA_FILE = os.path.join(_DATA_DIR, "call_log.json")
 
 DIRECTIONS = ("incoming", "outgoing", "missed")
 
