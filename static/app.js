@@ -105,28 +105,165 @@ function stopListening() {
 
 // ─── Speech Synthesis (Text-to-Speech) ────────────────────────────────────────
 
-function speak(text) {
-    if ('speechSynthesis' in window) {
-        // Cancel any ongoing speech
-        window.speechSynthesis.cancel();
+// Voice configuration
+let voiceConfig = {
+    tts_provider: 'browser',
+    has_elevenlabs: false,
+    humanization: { enabled: true },
+    speech_settings: { rate: 0.95, pitch: 1.0 },
+    selected_voice: null,
+    cloned_voices: [],
+};
+
+// Load voice configuration
+async function loadVoiceConfig() {
+    try {
+        const response = await fetch('/api/voice/config');
+        if (response.ok) {
+            voiceConfig = await response.json();
+        }
+    } catch (error) {
+        console.log('Using default voice config');
+    }
+}
+
+// Humanize text before speaking to make it sound more natural
+async function humanizeTextForSpeech(text, personaId) {
+    try {
+        const response = await fetch('/api/voice/humanize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, persona_id: personaId })
+        });
+        if (response.ok) {
+            const result = await response.json();
+            return result.humanized;
+        }
+    } catch (error) {
+        console.log('Humanization failed, using original text');
+    }
+    return text;
+}
+
+// Natural speech with pauses and variations
+function addNaturalPauses(text) {
+    // Add micro-pauses represented by commas for more natural rhythm
+    // Pause after "hmm", "uh", "well" etc
+    const pauseWords = ['hmm', 'hmmm', 'uh', 'uhh', 'well', 'ohh', 'mmm', 'ahh'];
+    pauseWords.forEach(word => {
+        const regex = new RegExp(`(${word})([^,\\.\\!\\?])`, 'gi');
+        text = text.replace(regex, '$1,$2');
+    });
+    return text;
+}
+
+// Get current persona ID from identity
+async function getCurrentPersonaId() {
+    try {
+        const response = await fetch('/api/identity');
+        if (response.ok) {
+            const identity = await response.json();
+            return identity.persona_id || null;
+        }
+    } catch (error) {
+        console.log('Could not get persona ID');
+    }
+    return null;
+}
+
+async function speak(text) {
+    if (!text) return;
+    
+    // Strip markdown and emojis first
+    let cleanText = stripForSpeech(text);
+    
+    // Get current persona for personalized speech
+    const personaId = await getCurrentPersonaId();
+    
+    // Humanize the text to sound more natural
+    if (voiceConfig.humanization?.enabled) {
+        cleanText = await humanizeTextForSpeech(cleanText, personaId);
+    }
+    
+    // Add natural pauses
+    cleanText = addNaturalPauses(cleanText);
+    
+    // Check if ElevenLabs is configured (for voice cloning)
+    if (voiceConfig.tts_provider === 'elevenlabs' && voiceConfig.has_elevenlabs) {
+        await speakWithElevenLabs(cleanText);
+    } else {
+        speakWithBrowser(cleanText, personaId);
+    }
+}
+
+function speakWithBrowser(text, personaId) {
+    if (!('speechSynthesis' in window)) return;
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Apply voice settings for more natural speech
+    const settings = voiceConfig.speech_settings || {};
+    utterance.rate = settings.rate || 0.95;  // Slightly slower for natural feel
+    utterance.pitch = settings.pitch || 1.0;
+    utterance.volume = settings.volume || 1.0;
+    
+    // Select appropriate voice based on persona
+    const voices = window.speechSynthesis.getVoices();
+    let selectedVoice = null;
+    
+    // Try to find a good voice based on persona
+    if (personaId === 'lamai') {
+        // For Lamai, try to find a female Asian/warm voice
+        selectedVoice = voices.find(v => 
+            (v.lang.includes('th') || v.lang.includes('en')) &&
+            (v.name.toLowerCase().includes('female') || 
+             v.name.toLowerCase().includes('samantha') ||
+             v.name.toLowerCase().includes('karen') ||
+             v.name.toLowerCase().includes('moira'))
+        ) || voices.find(v => v.name.toLowerCase().includes('female'));
         
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
+        // Adjust for warm, friendly tone
+        utterance.rate = 0.9;  // Slower, more relaxed
+        utterance.pitch = 1.1; // Slightly higher, warmer
+    } else if (personaId === 'coach_jv') {
+        // For Coach JV, find a male American voice
+        selectedVoice = voices.find(v => 
+            v.lang.includes('en-US') &&
+            (v.name.toLowerCase().includes('male') || 
+             v.name.toLowerCase().includes('alex') ||
+             v.name.toLowerCase().includes('daniel') ||
+             v.name.toLowerCase().includes('tom'))
+        ) || voices.find(v => v.name.toLowerCase().includes('male'));
         
-        // Try to use a female voice if available
-        const voices = window.speechSynthesis.getVoices();
-        const femaleVoice = voices.find(v => 
+        // Adjust for confident tone
+        utterance.rate = 1.0;  // Normal pace
+        utterance.pitch = 0.95; // Slightly lower, authoritative
+    } else {
+        // Default: try to find a nice female voice
+        selectedVoice = voices.find(v => 
             v.name.toLowerCase().includes('female') || 
             v.name.toLowerCase().includes('samantha') ||
-            v.name.toLowerCase().includes('victoria')
+            v.name.toLowerCase().includes('victoria') ||
+            v.name.toLowerCase().includes('karen')
         );
-        if (femaleVoice) {
-            utterance.voice = femaleVoice;
-        }
-        
-        window.speechSynthesis.speak(utterance);
     }
+    
+    if (selectedVoice) {
+        utterance.voice = selectedVoice;
+    }
+    
+    window.speechSynthesis.speak(utterance);
+}
+
+async function speakWithElevenLabs(text) {
+    // This function would integrate with ElevenLabs API for voice cloning
+    // For now, fall back to browser speech
+    console.log('ElevenLabs integration - would speak:', text);
+    // TODO: Implement ElevenLabs API call when API key is configured
+    speakWithBrowser(text, await getCurrentPersonaId());
 }
 
 // ─── Chat Functions ───────────────────────────────────────────────────────────
@@ -456,13 +593,18 @@ addCallForm.addEventListener('submit', addCall);
 
 // ─── Initialize ───────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadCalls();
+    
+    // Load voice configuration
+    await loadVoiceConfig();
     
     // Load voices for speech synthesis
     if ('speechSynthesis' in window) {
         window.speechSynthesis.onvoiceschanged = () => {
             window.speechSynthesis.getVoices();
         };
+        // Pre-load voices
+        window.speechSynthesis.getVoices();
     }
 });

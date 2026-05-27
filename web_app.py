@@ -5,6 +5,7 @@ from flask import Flask, render_template, request, jsonify
 
 import phone_log
 import assistant
+import voice_config
 
 app = Flask(__name__)
 
@@ -135,6 +136,73 @@ def api_set_persona(persona_id):
     if result:
         return jsonify(result)
     return jsonify({"error": f"Persona '{persona_id}' not found"}), 404
+
+
+# ─── Voice Configuration Endpoints ─────────────────────────────────────────────
+
+@app.route("/api/voice/config", methods=["GET"])
+def api_get_voice_config():
+    """Get voice configuration (safe for frontend - no API keys)."""
+    return jsonify(voice_config.get_voice_config_for_frontend())
+
+
+@app.route("/api/voice/config", methods=["PUT"])
+def api_update_voice_config():
+    """Update voice configuration."""
+    data = request.get_json()
+    updated = voice_config.update_voice_config(**data)
+    return jsonify(voice_config.get_voice_config_for_frontend())
+
+
+@app.route("/api/voice/humanize", methods=["POST"])
+def api_humanize_text():
+    """Humanize text to sound more natural."""
+    data = request.get_json()
+    text = data.get("text", "")
+    persona_id = data.get("persona_id")
+    
+    humanized = voice_config.humanize_text(text, persona_id)
+    return jsonify({"original": text, "humanized": humanized})
+
+
+@app.route("/api/voice/clones", methods=["GET"])
+def api_list_voice_clones():
+    """List all saved voice clones."""
+    return jsonify(voice_config.list_cloned_voices())
+
+
+@app.route("/api/voice/clones", methods=["POST"])
+def api_add_voice_clone():
+    """Add a new voice clone configuration."""
+    data = request.get_json()
+    name = data.get("name", "")
+    voice_id = data.get("voice_id", "")
+    provider = data.get("provider", "elevenlabs")
+    
+    if not name or not voice_id:
+        return jsonify({"error": "Name and voice_id are required"}), 400
+    
+    voice_config.add_cloned_voice(name, voice_id, provider)
+    return jsonify({"success": True, "message": f"Voice clone '{name}' added"})
+
+
+@app.route("/api/voice/clones/<name>", methods=["DELETE"])
+def api_remove_voice_clone(name):
+    """Remove a voice clone configuration."""
+    if voice_config.remove_cloned_voice(name):
+        return jsonify({"success": True, "message": f"Voice clone '{name}' removed"})
+    return jsonify({"error": f"Voice clone '{name}' not found"}), 404
+
+
+@app.route("/api/voice/elevenlabs", methods=["PUT"])
+def api_set_elevenlabs():
+    """Set ElevenLabs API configuration for voice cloning."""
+    data = request.get_json()
+    voice_config.set_elevenlabs_config(
+        api_key=data.get("api_key"),
+        voice_id=data.get("voice_id"),
+    )
+    return jsonify({"success": True, "message": "ElevenLabs configuration updated"})
 
 
 # ─── Main Entry Point ──────────────────────────────────────────────────────────
