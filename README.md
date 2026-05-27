@@ -137,6 +137,26 @@ python -m unittest tests/test_phone_log.py -v
 
 ---
 
+## Deploy to Render
+
+This app is ready for deployment to [Render](https://render.com) using the included Blueprint.
+
+### One-Click Deploy
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/KINGSACCOUNT1/Phone_log)
+
+### Manual Deploy
+
+1. Fork or push this repo to your GitHub account
+2. Go to [Render Dashboard](https://dashboard.render.com)
+3. Click **New** → **Blueprint**
+4. Connect your GitHub repository
+5. Render will automatically detect the `render.yaml` and deploy your app
+
+Your app will be live at `https://phone-log.onrender.com` (or similar URL).
+
+---
+
 ## Project Structure
 
 ```
