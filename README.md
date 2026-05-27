@@ -1,7 +1,7 @@
 # Phone Log
 
 A lightweight command-line and web application for logging and managing phone call records.  
-All data is stored locally in a `call_log.json` file – no external dependencies required.
+All data is stored locally in a `call_log.json` file – no external database required.
 
 ---
 
