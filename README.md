@@ -16,16 +16,50 @@ All data is stored locally in a `call_log.json` file – no external dependencie
 | Delete a record by ID | ✅ |
 | Update notes on an existing record | ✅ |
 | Human-readable duration formatting | ✅ |
+| **Web GUI with voice assistant** | ✅ |
+| **Customizable assistant identity** | ✅ |
+| **Speech recognition input** | ✅ |
+| **Synthesis preview (reasoning/response)** | ✅ |
 
 ---
 
 ## Requirements
 
-- Python 3.8 or later (standard library only – no `pip install` needed)
+- Python 3.8 or later
+- Flask (for web interface): `pip install flask`
 
 ---
 
-## Usage
+## Web Interface (GUI)
+
+### Starting the Web App
+
+```bash
+pip install flask
+python web_app.py
+```
+
+Then open **http://localhost:5000** in your browser.
+
+### Features
+
+1. **Voice Assistant**: Click the 🎤 microphone button and speak naturally
+2. **Customizable Identity**: Click ⚙️ to change the assistant's name, role, personality, and greeting
+3. **Synthesis Preview**: See the assistant's reasoning process in real-time
+4. **Call Management**: Add, view, search, and delete calls through the GUI
+
+### Example Voice Commands
+
+- "Show my calls"
+- "Search for Alice"
+- "How many calls do I have?"
+- "Delete call 5"
+- "Who are you?"
+- "Help"
+
+---
+
+## CLI Usage
 
 Run commands through `cli.py`:
 
@@ -109,7 +143,15 @@ python -m unittest tests/test_phone_log.py -v
 Phone_log/
 ├── phone_log.py          # Core module – data model and CRUD operations
 ├── cli.py                # Command-line interface (argparse)
+├── assistant.py          # Voice assistant – intent recognition & response generation
+├── web_app.py            # Flask web server with API endpoints
+├── templates/
+│   └── index.html        # Web interface HTML
+├── static/
+│   ├── style.css         # Web interface styles
+│   └── app.js            # Client-side JavaScript (speech recognition, API)
 ├── call_log.json         # Auto-created data file (git-ignored)
+├── assistant_identity.json  # Assistant customization (git-ignored)
 ├── tests/
 │   └── test_phone_log.py # Unit tests
 └── README.md

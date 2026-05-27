@@ -1,4 +1,5 @@
 call_log.json
+assistant_identity.json
 __pycache__/
 *.pyc
 *.pyo

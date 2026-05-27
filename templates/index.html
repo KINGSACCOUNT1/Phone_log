@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ identity.name }} - Phone Log Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header with Assistant Identity -->
+        <header class="header">
+            <div class="identity-section">
+                <div class="avatar">
+                    <span class="avatar-icon">🤖</span>
+                </div>
+                <div class="identity-info">
+                    <h1 class="assistant-name" id="assistantName">{{ identity.name }}</h1>
+                    <p class="assistant-role" id="assistantRole">{{ identity.role }}</p>
+                </div>
+                <button class="btn-icon" id="settingsBtn" title="Customize Assistant">⚙️</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Chat Section -->
+            <section class="chat-section">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message assistant">
+                        <div class="message-content">{{ identity.greeting }}</div>
+                    </div>
+                </div>
+                
+                <!-- Input Area -->
+                <div class="input-area">
+                    <button class="btn-mic" id="micBtn" title="Click to speak">
+                        <span class="mic-icon">🎤</span>
+                    </button>
+                    <input type="text" id="textInput" placeholder="Type or click the mic to speak..." autocomplete="off">
+                    <button class="btn-send" id="sendBtn">Send</button>
+                </div>
+                <div class="voice-status" id="voiceStatus"></div>
+            </section>
+
+            <!-- Synthesis Preview Panel -->
+            <aside class="synthesis-panel" id="synthesisPanel">
+                <h2 class="panel-title">
+                    <span>🧠</span> Synthesis Preview
+                </h2>
+                <div class="synthesis-content">
+                    <div class="synthesis-section">
+                        <h3>Reasoning</h3>
+                        <p id="reasoningText" class="reasoning-text">
+                            Waiting for your input...
+                        </p>
+                    </div>
+                    <div class="synthesis-section">
+                        <h3>Action Taken</h3>
+                        <p id="actionText" class="action-text">None yet</p>
+                    </div>
+                    <div class="synthesis-section">
+                        <h3>Data Retrieved</h3>
+                        <pre id="dataPreview" class="data-preview">No data</pre>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Quick Actions / Call Log Section -->
+        <section class="calls-section">
+            <div class="section-header">
+                <h2>📞 Call Log</h2>
+                <button class="btn-primary" id="addCallBtn">+ Add Call</button>
+            </div>
+            <div class="calls-list" id="callsList">
+                <p class="empty-state">Loading calls...</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Customize Assistant</h2>
+                <button class="btn-close" id="closeSettingsBtn">&times;</button>
+            </div>
+            <form id="identityForm">
+                <div class="form-group">
+                    <label for="identityName">Name</label>
+                    <input type="text" id="identityName" value="{{ identity.name }}">
+                </div>
+                <div class="form-group">
+                    <label for="identityRole">Role</label>
+                    <input type="text" id="identityRole" value="{{ identity.role }}">
+                </div>
+                <div class="form-group">
+                    <label for="identityPersonality">Personality</label>
+                    <input type="text" id="identityPersonality" value="{{ identity.personality }}">
+                </div>
+                <div class="form-group">
+                    <label for="identityGreeting">Greeting</label>
+                    <textarea id="identityGreeting" rows="2">{{ identity.greeting }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="identityVoice">Voice Style</label>
+                    <select id="identityVoice">
+                        <option value="female" {% if identity.voice == 'female' %}selected{% endif %}>Female</option>
+                        <option value="male" {% if identity.voice == 'male' %}selected{% endif %}>Male</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary btn-full">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Call Modal -->
+    <div class="modal" id="addCallModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📞 Add New Call</h2>
+                <button class="btn-close" id="closeAddCallBtn">&times;</button>
+            </div>
+            <form id="addCallForm">
+                <div class="form-group">
+                    <label for="callName">Contact Name</label>
+                    <input type="text" id="callName" required placeholder="e.g., John Smith">
+                </div>
+                <div class="form-group">
+                    <label for="callNumber">Phone Number</label>
+                    <input type="tel" id="callNumber" required placeholder="e.g., 555-1234">
+                </div>
+                <div class="form-group">
+                    <label for="callDirection">Direction</label>
+                    <select id="callDirection" required>
+                        <option value="incoming">↙️ Incoming</option>
+                        <option value="outgoing">↗️ Outgoing</option>
+                        <option value="missed">✗ Missed</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="callDuration">Duration (seconds)</label>
+                    <input type="number" id="callDuration" min="0" placeholder="Leave empty for missed calls">
+                </div>
+                <div class="form-group">
+                    <label for="callNotes">Notes</label>
+                    <textarea id="callNotes" rows="2" placeholder="Optional notes about the call"></textarea>
+                </div>
+                <button type="submit" class="btn-primary btn-full">Add Call</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
