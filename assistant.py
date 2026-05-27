@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timezone
 
 import phone_log
+import personas
 
 # ─── Assistant Identity ────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ DEFAULT_IDENTITY = {
     "personality": "friendly, helpful, and concise",
     "greeting": "Hello dear, how are you doing today?",
     "voice": "female",
+    "persona_id": None,
 }
 
 
@@ -49,6 +51,20 @@ def update_identity(name=None, role=None, personality=None, greeting=None, voice
         identity["voice"] = voice.strip()
     save_identity(identity)
     return identity
+
+
+def set_persona(persona_id):
+    """Set the assistant to use a predefined persona."""
+    persona_identity = personas.persona_to_identity(persona_id)
+    if persona_identity:
+        save_identity(persona_identity)
+        return persona_identity
+    return None
+
+
+def get_available_personas():
+    """Get list of available personas."""
+    return personas.list_personas()
 
 
 # ─── Intent Recognition ────────────────────────────────────────────────────────
@@ -88,6 +104,11 @@ INTENT_PATTERNS = {
     "identity": [
         r"(?:who\s+are\s+you|what(?:'s|\s+is)\s+your\s+name|introduce\s+yourself)",
         r"(?:tell\s+me\s+about\s+yourself)",
+    ],
+    "full_name": [
+        r"(?:what(?:'s|\s+is)\s+your\s+full\s+name)",
+        r"(?:your\s+full\s+name)",
+        r"(?:tell\s+me\s+your\s+full\s+name)",
     ],
     "stats": [
         r"(?:how\s+many|count|total)\s+(?:calls|records)",
@@ -144,24 +165,53 @@ def generate_response(user_input):
     
     # ─── Handle each intent ────────────────────────────────────────────────────
     
+    # Get persona ID if using a persona
+    persona_id = identity.get("persona_id")
+    
     if intent == "greeting":
         result["reasoning"] = (
             f"User greeted me. I should respond warmly and wait for their response "
             f"before providing any additional information."
         )
-        result["response"] = "Hello dear, how are you doing today?"
+        # Use persona-specific greeting if available
+        if persona_id:
+            response = identity.get("greeting", "Hello dear, how are you doing today?")
+            response = personas.add_speech_flavor(persona_id, response)
+            result["response"] = response
+        else:
+            result["response"] = "Hello dear, how are you doing today?"
         result["action_taken"] = "greeted_user"
+    
+    elif intent == "full_name":
+        result["reasoning"] = (
+            f"User is asking for my full name. I'll provide it if I have one."
+        )
+        full_name = identity.get("full_name", assistant_name)
+        if persona_id:
+            if persona_id == "lamai":
+                result["response"] = f"Ohh, hmmm... my full name is {full_name}. But please, just call me {assistant_name}!"
+            elif persona_id == "coach_jv":
+                result["response"] = f"My full name is {full_name}. But everyone calls me {assistant_name}!"
+            else:
+                result["response"] = f"My full name is {full_name}."
+        else:
+            result["response"] = f"My name is {assistant_name}."
+        result["action_taken"] = "told_full_name"
         
     elif intent == "identity":
         result["reasoning"] = (
             f"User wants to know about me. I'll introduce myself as {assistant_name}, "
             f"the {identity['role']}."
         )
-        result["response"] = (
-            f"I'm {assistant_name}, your {identity['role']}! "
-            f"I'm {identity['personality']}. I can help you log calls, search your "
-            f"call history, and manage your phone records. Just ask!"
-        )
+        # Use persona-specific intro if available
+        if persona_id:
+            result["response"] = personas.format_persona_intro(persona_id)
+        else:
+            result["response"] = (
+                f"I'm {assistant_name}, your {identity['role']}! "
+                f"I'm {identity['personality']}. I can help you log calls, search your "
+                f"call history, and manage your phone records. Just ask!"
+            )
         result["action_taken"] = "introduced_self"
         
     elif intent == "help":
@@ -169,7 +219,7 @@ def generate_response(user_input):
             "User needs help understanding my capabilities. I'll list what I can do "
             "in a clear and friendly way."
         )
-        result["response"] = (
+        help_text = (
             f"Here's what I can help you with:\n\n"
             f"📞 **Add a call**: Say 'Log a call from [name]' or 'I had a call with [name]'\n"
             f"📋 **View calls**: Say 'Show my calls' or 'List all calls'\n"
@@ -178,6 +228,9 @@ def generate_response(user_input):
             f"📊 **Stats**: Say 'How many calls do I have?'\n\n"
             f"Just speak naturally – I'll do my best to understand!"
         )
+        if persona_id:
+            help_text = personas.add_speech_flavor(persona_id, help_text)
+        result["response"] = help_text
         result["action_taken"] = "showed_help"
         
     elif intent == "list_calls":

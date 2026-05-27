@@ -120,6 +120,23 @@ def api_clear_history():
     return jsonify({"success": True, "message": "History cleared"})
 
 
+# ─── Persona Endpoints ─────────────────────────────────────────────────────────
+
+@app.route("/api/personas", methods=["GET"])
+def api_list_personas():
+    """List all available personas."""
+    return jsonify(assistant.get_available_personas())
+
+
+@app.route("/api/personas/<persona_id>", methods=["POST"])
+def api_set_persona(persona_id):
+    """Set the assistant to use a specific persona."""
+    result = assistant.set_persona(persona_id)
+    if result:
+        return jsonify(result)
+    return jsonify({"error": f"Persona '{persona_id}' not found"}), 404
+
+
 # ─── Main Entry Point ──────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
