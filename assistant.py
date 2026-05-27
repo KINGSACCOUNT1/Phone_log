@@ -146,10 +146,10 @@ def generate_response(user_input):
     
     if intent == "greeting":
         result["reasoning"] = (
-            f"User greeted me. I should respond warmly as {assistant_name}, "
-            f"maintaining my {identity['personality']} personality."
+            f"User greeted me. I should respond warmly and wait for their response "
+            f"before providing any additional information."
         )
-        result["response"] = identity["greeting"]
+        result["response"] = "Hello dear, how are you doing today?"
         result["action_taken"] = "greeted_user"
         
     elif intent == "identity":
