@@ -327,7 +327,7 @@ def api_backup():
     
     backup_data = {
         "version": "1.0",
-        "timestamp": import_datetime().isoformat(),
+        "timestamp": get_current_utc_datetime().isoformat(),
         "calls": calls,
         "identity": identity,
         "voice_config": voice_cfg,
@@ -367,12 +367,14 @@ def api_restore():
             voice_config.save_voice_config(backup_data["voice_config"])
         
         return jsonify({"success": True, "message": "Backup restored successfully"})
-    except Exception as e:
-        return jsonify({"error": f"Restore failed: {str(e)}"}), 400
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return jsonify({"error": "Invalid backup format"}), 400
+    except Exception:
+        return jsonify({"error": "Restore failed. Please check the backup file."}), 400
 
 
-def import_datetime():
-    """Import datetime.datetime to avoid circular imports."""
+def get_current_utc_datetime():
+    """Return the current UTC datetime."""
     from datetime import datetime, timezone
     return datetime.now(timezone.utc)
 

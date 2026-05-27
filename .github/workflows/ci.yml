@@ -6,10 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+# Restrict permissions for all jobs
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       
@@ -41,6 +47,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
@@ -75,6 +83,8 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       
@@ -97,6 +107,8 @@ jobs:
   build:
     name: Build Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: [lint, test]
     steps:
       - uses: actions/checkout@v4
@@ -122,6 +134,8 @@ jobs:
   deploy-preview:
     name: Deploy Preview
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: build
     if: github.event_name == 'pull_request'
     steps:
@@ -133,6 +147,8 @@ jobs:
   deploy-production:
     name: Deploy Production
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
