@@ -14,7 +14,7 @@ services:
       - key: FLASK_DEBUG
         value: "false"
       - key: DATA_DIR
-        value: /data
+        value: /data  # must match disk.mountPath below
     healthCheckPath: /
     disk:
       name: phone-log-data

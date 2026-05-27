@@ -11,7 +11,7 @@ import re
 
 # ─── Configuration File ────────────────────────────────────────────────────────
 
-_DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
+_DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))  # resolved data directory
 VOICE_CONFIG_FILE = os.path.join(_DATA_DIR, "voice_config.json")
 
 DEFAULT_VOICE_CONFIG = {

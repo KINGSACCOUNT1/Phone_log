@@ -10,7 +10,7 @@ import personas
 
 # ─── Assistant Identity ────────────────────────────────────────────────────────
 
-_DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
+_DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))  # resolved data directory
 IDENTITY_FILE = os.path.join(_DATA_DIR, "assistant_identity.json")
 
 DEFAULT_IDENTITY = {
