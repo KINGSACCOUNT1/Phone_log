@@ -1,4 +1,11 @@
-"""Phone Log Assistant - conversational AI assistant for managing phone calls."""
+"""Phone Log Assistant - conversational AI assistant for managing phone calls.
+
+Enhanced with:
+- LLM integration for complex intent understanding
+- Semantic memory for long-term context
+- Emotion detection for empathetic responses
+- Multi-turn dialog management with slot filling
+"""
 
 import json
 import os
@@ -7,6 +14,31 @@ from datetime import datetime, timezone
 
 import phone_log
 import personas
+
+# Import new AI enhancement modules
+try:
+    import llm_integration
+    LLM_AVAILABLE = True
+except ImportError:
+    LLM_AVAILABLE = False
+
+try:
+    import semantic_memory
+    MEMORY_AVAILABLE = True
+except ImportError:
+    MEMORY_AVAILABLE = False
+
+try:
+    import emotion_detection
+    EMOTION_AVAILABLE = True
+except ImportError:
+    EMOTION_AVAILABLE = False
+
+try:
+    import dialog_manager
+    DIALOG_AVAILABLE = True
+except ImportError:
+    DIALOG_AVAILABLE = False
 
 # ─── Assistant Identity ────────────────────────────────────────────────────────
 
@@ -122,11 +154,37 @@ def recognize_intent(text):
     """
     Recognize user intent from natural language text.
     
+    Uses LLM for complex cases, falls back to pattern matching.
+    
     Returns:
         tuple: (intent_name, extracted_entities, confidence)
     """
     text = text.strip().lower()
     
+    # Try LLM-based intent recognition first if available and enabled
+    if LLM_AVAILABLE and llm_integration.is_llm_enabled():
+        try:
+            llm_result = llm_integration.extract_intent_with_llm(text)
+            if llm_result and llm_result.get("confidence", 0) > 0.5:
+                intent = llm_result.get("intent", "unknown")
+                entities = llm_result.get("entities", {})
+                confidence = llm_result.get("confidence", 0.8)
+                
+                # Convert entities dict to tuple for compatibility
+                entity_tuple = tuple(
+                    v for v in [
+                        entities.get("contact_name"),
+                        entities.get("phone_number"),
+                        entities.get("call_id"),
+                        entities.get("search_query"),
+                    ] if v
+                )
+                
+                return (intent, entity_tuple, confidence)
+        except Exception:
+            pass  # Fall back to pattern matching
+    
+    # Pattern-based intent recognition
     for intent, patterns in INTENT_PATTERNS.items():
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -374,9 +432,218 @@ def chat(user_input):
     """
     Main chat function - process input and maintain conversation history.
     
+    Enhanced with:
+    - Emotion detection for empathetic responses
+    - Multi-turn dialog management
+    - Semantic memory integration
+    - LLM fallback for unknown intents
+    
     Returns:
         dict: Full response including reasoning, response text, and any data
     """
+    identity = load_identity()
+    
+    # Analyze emotion if available
+    emotion_data = None
+    if EMOTION_AVAILABLE:
+        emotion_data = emotion_detection.analyze_emotion(user_input)
+    
+    # Check if we're in an active dialog flow
+    if DIALOG_AVAILABLE and dialog_manager.is_in_dialog():
+        dialog_result = dialog_manager.process_dialog_input(user_input)
+        
+        if dialog_result.get("completed"):
+            # Dialog completed - execute the action
+            collected_data = dialog_result.get("collected_data", {})
+            flow_name = dialog_manager.dialog_manager.state.flow_name if dialog_manager.dialog_manager.state else None
+            
+            if flow_name == "add_call":
+                # Add the call
+                try:
+                    entry = phone_log.add_call(
+                        contact_name=collected_data.get("contact_name", "Unknown"),
+                        phone_number=collected_data.get("phone_number", ""),
+                        direction=collected_data.get("direction", "incoming"),
+                        duration_seconds=collected_data.get("duration", 0),
+                        notes=collected_data.get("notes", ""),
+                    )
+                    result = {
+                        "reasoning": f"User completed the add_call dialog flow. Added call with {collected_data.get('contact_name')}.",
+                        "response": dialog_result.get("response", "Call added successfully!"),
+                        "action_taken": "added_call",
+                        "data": entry,
+                    }
+                except Exception as e:
+                    result = {
+                        "reasoning": f"Dialog completed but call creation failed: {str(e)}",
+                        "response": "I'm sorry, there was an error adding the call. Please try again.",
+                        "action_taken": "add_call_failed",
+                        "data": None,
+                    }
+            else:
+                result = {
+                    "reasoning": f"Dialog flow '{flow_name}' completed.",
+                    "response": dialog_result.get("response", "Done!"),
+                    "action_taken": f"completed_{flow_name}",
+                    "data": collected_data,
+                }
+        elif dialog_result.get("in_flow"):
+            # Still in dialog - return the prompt
+            result = {
+                "reasoning": "Continuing multi-turn dialog flow.",
+                "response": dialog_result.get("prompt", "Please continue..."),
+                "action_taken": "dialog_continue",
+                "data": None,
+                "dialog_state": dialog_result.get("state"),
+            }
+        else:
+            # Dialog cancelled or error
+            result = {
+                "reasoning": "Dialog was cancelled or encountered an error.",
+                "response": dialog_result.get("response", "Dialog ended."),
+                "action_taken": "dialog_ended",
+                "data": None,
+            }
+        
+        # Add emotion data if available
+        if emotion_data:
+            result["emotion"] = emotion_data
+            # Adjust response tone based on emotion
+            if emotion_data.get("emotion") in ["sad", "angry", "frustrated"]:
+                result["response"] = emotion_detection.adjust_response_tone(
+                    result["response"],
+                    emotion_data["emotion"],
+                    emotion_data["sentiment"]
+                )
+        
+        conversation.add_exchange(user_input, result["response"])
+        return result
+    
+    # Standard response generation
     result = generate_response(user_input)
+    
+    # If unknown intent and LLM is available, try to handle with LLM
+    if result["action_taken"] == "asked_clarification" and LLM_AVAILABLE and llm_integration.is_llm_enabled():
+        try:
+            context = _get_conversation_context()
+            llm_response = llm_integration.handle_unknown_with_llm(user_input, identity, context)
+            if llm_response:
+                result["response"] = llm_response
+                result["reasoning"] = "Used LLM to handle unknown intent."
+        except Exception:
+            pass  # Keep original response
+    
+    # Check if we should start a dialog flow
+    intent, _, _ = recognize_intent(user_input)
+    if DIALOG_AVAILABLE and intent == "add_call":
+        # Start the add_call dialog flow
+        dialog_result = dialog_manager.start_dialog("add_call")
+        if dialog_result.get("success"):
+            result["response"] = dialog_result.get("prompt", result["response"])
+            result["action_taken"] = "started_dialog"
+            result["dialog_state"] = dialog_result.get("state")
+    
+    # Add emotion data and adjust response
+    if emotion_data:
+        result["emotion"] = emotion_data
+        # Adjust response tone based on emotion
+        if emotion_data.get("emotion") in ["sad", "angry", "frustrated", "anxious"]:
+            result["response"] = emotion_detection.adjust_response_tone(
+                result["response"],
+                emotion_data["emotion"],
+                emotion_data["sentiment"]
+            )
+    
+    # Store relevant facts in semantic memory
+    if MEMORY_AVAILABLE:
+        try:
+            semantic_memory.auto_memorize(
+                semantic_memory.get_memory(),
+                user_input,
+                result["response"]
+            )
+        except Exception:
+            pass  # Don't fail if memory storage fails
+    
     conversation.add_exchange(user_input, result["response"])
     return result
+
+
+def _get_conversation_context() -> str:
+    """Get recent conversation context as a string."""
+    history = conversation.get_history()
+    if not history:
+        return ""
+    
+    context_parts = []
+    for exchange in history[-5:]:  # Last 5 exchanges
+        context_parts.append(f"User: {exchange['user']}")
+        context_parts.append(f"Assistant: {exchange['assistant']}")
+    
+    return "\n".join(context_parts)
+
+
+# ─── Enhanced API Functions ────────────────────────────────────────────────────
+
+def get_ai_capabilities() -> dict:
+    """Get information about available AI capabilities."""
+    return {
+        "llm_available": LLM_AVAILABLE,
+        "llm_enabled": LLM_AVAILABLE and llm_integration.is_llm_enabled() if LLM_AVAILABLE else False,
+        "memory_available": MEMORY_AVAILABLE,
+        "emotion_detection_available": EMOTION_AVAILABLE,
+        "dialog_manager_available": DIALOG_AVAILABLE,
+    }
+
+
+def configure_llm(provider: str, api_key: str, model: str = None) -> dict:
+    """Configure LLM integration."""
+    if not LLM_AVAILABLE:
+        return {"success": False, "error": "LLM integration not available"}
+    
+    try:
+        if provider == "openai":
+            llm_integration.set_openai_config(api_key, model or "gpt-3.5-turbo")
+        elif provider == "anthropic":
+            llm_integration.set_anthropic_config(api_key, model or "claude-3-haiku-20240307")
+        elif provider == "local":
+            llm_integration.set_local_llm_config(api_key, model or "llama2")
+        else:
+            return {"success": False, "error": f"Unknown provider: {provider}"}
+        
+        return {"success": True, "provider": provider, "enabled": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def get_memory_summary(topics: list = None) -> str:
+    """Get relevant memory context."""
+    if not MEMORY_AVAILABLE:
+        return ""
+    
+    return semantic_memory.get_relevant_context(topics)
+
+
+def remember_fact(content: str, memory_type: str = "fact", tags: list = None) -> dict:
+    """Manually add a fact to memory."""
+    if not MEMORY_AVAILABLE:
+        return {"success": False, "error": "Memory not available"}
+    
+    try:
+        entry = semantic_memory.remember(content, memory_type, tags)
+        return {"success": True, "memory_id": entry.memory_id}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def search_memories(query: str, limit: int = 5) -> list:
+    """Search through semantic memories."""
+    if not MEMORY_AVAILABLE:
+        return []
+    
+    try:
+        results = semantic_memory.recall(query, limit)
+        return [m.to_dict() for m in results]
+    except Exception:
+        return []
+

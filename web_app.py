@@ -1,4 +1,12 @@
-"""Phone Log Web Application - Flask-based web interface with voice assistant."""
+"""Phone Log Web Application - Flask-based web interface with voice assistant.
+
+Enhanced with:
+- AI capabilities configuration endpoints
+- Semantic memory management
+- Emotion detection
+- Dialog flow management
+- WebSocket voice streaming
+"""
 
 import json
 from flask import Flask, render_template, request, jsonify, Response
@@ -8,6 +16,37 @@ import assistant
 import voice_config
 import analytics
 import export
+
+# Import new AI enhancement modules
+try:
+    import llm_integration
+    LLM_AVAILABLE = True
+except ImportError:
+    LLM_AVAILABLE = False
+
+try:
+    import semantic_memory
+    MEMORY_AVAILABLE = True
+except ImportError:
+    MEMORY_AVAILABLE = False
+
+try:
+    import emotion_detection
+    EMOTION_AVAILABLE = True
+except ImportError:
+    EMOTION_AVAILABLE = False
+
+try:
+    import dialog_manager
+    DIALOG_AVAILABLE = True
+except ImportError:
+    DIALOG_AVAILABLE = False
+
+try:
+    import voice_streaming
+    VOICE_STREAMING_AVAILABLE = True
+except ImportError:
+    VOICE_STREAMING_AVAILABLE = False
 
 app = Flask(__name__)
 
@@ -377,6 +416,281 @@ def get_current_utc_datetime():
     """Return the current UTC datetime."""
     from datetime import datetime, timezone
     return datetime.now(timezone.utc)
+
+
+# ─── AI Capabilities Endpoints ─────────────────────────────────────────────────
+
+@app.route("/api/ai/capabilities", methods=["GET"])
+def api_get_ai_capabilities():
+    """Get information about available AI capabilities."""
+    return jsonify(assistant.get_ai_capabilities())
+
+
+@app.route("/api/ai/llm/config", methods=["GET"])
+def api_get_llm_config():
+    """Get LLM configuration (safe for frontend)."""
+    if not LLM_AVAILABLE:
+        return jsonify({"available": False})
+    return jsonify({
+        "available": True,
+        **llm_integration.get_llm_config_for_frontend()
+    })
+
+
+@app.route("/api/ai/llm/config", methods=["PUT"])
+def api_set_llm_config():
+    """Configure LLM integration."""
+    data = request.get_json()
+    provider = data.get("provider", "openai")
+    api_key = data.get("api_key", "")
+    model = data.get("model")
+    
+    result = assistant.configure_llm(provider, api_key, model)
+    return jsonify(result)
+
+
+# ─── Semantic Memory Endpoints ─────────────────────────────────────────────────
+
+@app.route("/api/ai/memory", methods=["GET"])
+def api_get_memories():
+    """Search or list memories."""
+    if not MEMORY_AVAILABLE:
+        return jsonify({"available": False, "memories": []})
+    
+    query = request.args.get("q", "")
+    memory_type = request.args.get("type")
+    limit = request.args.get("limit", 20, type=int)
+    
+    if query:
+        results = assistant.search_memories(query, limit)
+    else:
+        memory = semantic_memory.get_memory()
+        if memory_type:
+            results = [m.to_dict() for m in memory.get_by_type(memory_type, limit)]
+        else:
+            results = [m.to_dict() for m in memory.memories[:limit]]
+    
+    return jsonify({"available": True, "memories": results})
+
+
+@app.route("/api/ai/memory", methods=["POST"])
+def api_add_memory():
+    """Add a new memory."""
+    if not MEMORY_AVAILABLE:
+        return jsonify({"success": False, "error": "Memory not available"})
+    
+    data = request.get_json()
+    content = data.get("content", "")
+    memory_type = data.get("type", "fact")
+    tags = data.get("tags", [])
+    importance = data.get("importance", 0.5)
+    
+    if not content:
+        return jsonify({"error": "Content is required"}), 400
+    
+    result = assistant.remember_fact(content, memory_type, tags)
+    return jsonify(result)
+
+
+@app.route("/api/ai/memory/<memory_id>", methods=["DELETE"])
+def api_delete_memory(memory_id):
+    """Delete a memory by ID."""
+    if not MEMORY_AVAILABLE:
+        return jsonify({"success": False, "error": "Memory not available"})
+    
+    if semantic_memory.forget(memory_id):
+        return jsonify({"success": True, "message": f"Memory {memory_id} deleted"})
+    return jsonify({"error": f"Memory {memory_id} not found"}), 404
+
+
+@app.route("/api/ai/memory/context", methods=["GET"])
+def api_get_memory_context():
+    """Get contextual memory summary."""
+    if not MEMORY_AVAILABLE:
+        return jsonify({"available": False, "context": ""})
+    
+    topics = request.args.getlist("topic")
+    context = assistant.get_memory_summary(topics if topics else None)
+    return jsonify({"available": True, "context": context})
+
+
+# ─── Emotion Detection Endpoints ───────────────────────────────────────────────
+
+@app.route("/api/ai/emotion", methods=["POST"])
+def api_analyze_emotion():
+    """Analyze emotion in text."""
+    if not EMOTION_AVAILABLE:
+        return jsonify({"available": False})
+    
+    data = request.get_json()
+    text = data.get("text", "")
+    
+    if not text:
+        return jsonify({"error": "Text is required"}), 400
+    
+    result = emotion_detection.analyze_emotion(text)
+    return jsonify({"available": True, **result})
+
+
+@app.route("/api/ai/emotion/context", methods=["GET"])
+def api_get_emotional_context():
+    """Get emotional context from conversation."""
+    if not EMOTION_AVAILABLE:
+        return jsonify({"available": False})
+    
+    ctx = emotion_detection.get_emotional_context()
+    return jsonify({
+        "available": True,
+        "trend": ctx.get_emotional_trend(),
+        "sentiment_trend": ctx.get_sentiment_trend(),
+        "is_escalating": ctx.is_escalating_negative(),
+        "history": ctx.history,
+    })
+
+
+# ─── Dialog Manager Endpoints ──────────────────────────────────────────────────
+
+@app.route("/api/ai/dialog/status", methods=["GET"])
+def api_get_dialog_status():
+    """Get current dialog status."""
+    if not DIALOG_AVAILABLE:
+        return jsonify({"available": False, "in_dialog": False})
+    
+    dm = dialog_manager.get_dialog_manager()
+    return jsonify({
+        "available": True,
+        "in_dialog": dm.is_in_flow(),
+        "current_flow": dm.get_current_flow(),
+        "state": dm.get_state(),
+    })
+
+
+@app.route("/api/ai/dialog/flows", methods=["GET"])
+def api_list_dialog_flows():
+    """List available dialog flows."""
+    if not DIALOG_AVAILABLE:
+        return jsonify({"available": False, "flows": []})
+    
+    dm = dialog_manager.get_dialog_manager()
+    flows = []
+    for flow_id, flow_data in dm.flows.items():
+        flows.append({
+            "id": flow_id,
+            "name": flow_data.get("name", flow_id),
+            "description": flow_data.get("description", ""),
+        })
+    
+    return jsonify({"available": True, "flows": flows})
+
+
+@app.route("/api/ai/dialog/start/<flow_name>", methods=["POST"])
+def api_start_dialog(flow_name):
+    """Start a dialog flow."""
+    if not DIALOG_AVAILABLE:
+        return jsonify({"success": False, "error": "Dialog manager not available"})
+    
+    result = dialog_manager.start_dialog(flow_name)
+    return jsonify(result)
+
+
+@app.route("/api/ai/dialog/input", methods=["POST"])
+def api_dialog_input():
+    """Process input in the current dialog."""
+    if not DIALOG_AVAILABLE:
+        return jsonify({"success": False, "error": "Dialog manager not available"})
+    
+    data = request.get_json()
+    user_input = data.get("input", "")
+    
+    if not user_input:
+        return jsonify({"error": "Input is required"}), 400
+    
+    result = dialog_manager.process_dialog_input(user_input)
+    return jsonify(result)
+
+
+@app.route("/api/ai/dialog/cancel", methods=["POST"])
+def api_cancel_dialog():
+    """Cancel the current dialog."""
+    if not DIALOG_AVAILABLE:
+        return jsonify({"success": False, "error": "Dialog manager not available"})
+    
+    result = dialog_manager.cancel_dialog()
+    return jsonify(result)
+
+
+# ─── Voice Streaming Endpoints ─────────────────────────────────────────────────
+
+@app.route("/api/voice/stream/sessions", methods=["GET"])
+def api_list_voice_sessions():
+    """List active voice streaming sessions."""
+    if not VOICE_STREAMING_AVAILABLE:
+        return jsonify({"available": False, "sessions": []})
+    
+    manager = voice_streaming.get_voice_stream_manager()
+    return jsonify({
+        "available": True,
+        "sessions": manager.list_sessions(),
+    })
+
+
+@app.route("/api/voice/stream/session", methods=["POST"])
+def api_create_voice_session():
+    """Create a new voice streaming session."""
+    if not VOICE_STREAMING_AVAILABLE:
+        return jsonify({"success": False, "error": "Voice streaming not available"})
+    
+    data = request.get_json() or {}
+    config_data = data.get("config", {})
+    
+    config = voice_streaming.VoiceStreamConfig(
+        sample_rate=config_data.get("sample_rate", 16000),
+        channels=config_data.get("channels", 1),
+        format=config_data.get("format", "pcm"),
+        language=config_data.get("language", "en-US"),
+    )
+    
+    manager = voice_streaming.get_voice_stream_manager()
+    session = manager.create_session(config=config)
+    
+    return jsonify({
+        "success": True,
+        "session": session.to_dict(),
+    })
+
+
+@app.route("/api/voice/stream/session/<session_id>", methods=["DELETE"])
+def api_close_voice_session(session_id):
+    """Close a voice streaming session."""
+    if not VOICE_STREAMING_AVAILABLE:
+        return jsonify({"success": False, "error": "Voice streaming not available"})
+    
+    manager = voice_streaming.get_voice_stream_manager()
+    if manager.close_session(session_id):
+        return jsonify({"success": True, "message": f"Session {session_id} closed"})
+    return jsonify({"error": f"Session {session_id} not found"}), 404
+
+
+@app.route("/api/voice/stream/session/<session_id>/text", methods=["POST"])
+def api_voice_session_text(session_id):
+    """Send text input to a voice session."""
+    if not VOICE_STREAMING_AVAILABLE:
+        return jsonify({"success": False, "error": "Voice streaming not available"})
+    
+    data = request.get_json()
+    text = data.get("text", "")
+    
+    if not text:
+        return jsonify({"error": "Text is required"}), 400
+    
+    handler = voice_streaming.create_voice_handler(assistant.chat)
+    result = handler.handle_message({
+        "type": "text",
+        "session_id": session_id,
+        "text": text,
+    })
+    
+    return jsonify(result)
 
 
 # ─── Main Entry Point ──────────────────────────────────────────────────────────

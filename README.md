@@ -30,6 +30,16 @@ All data is stored locally in a `call_log.json` file – no external database re
 | **CI/CD with GitHub Actions** | ✅ |
 | **API documentation (OpenAPI)** | ✅ |
 
+### 🆕 AI Enhancements
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **LLM Integration** | ✅ | OpenAI/Claude/Local LLM support for advanced intent understanding |
+| **Semantic Memory** | ✅ | Long-term context storage for personalized conversations |
+| **Emotion Detection** | ✅ | Sentiment analysis and empathetic response adjustment |
+| **Multi-turn Dialog** | ✅ | Slot-filling dialog management for complex tasks |
+| **Voice Streaming** | ✅ | WebSocket support for real-time voice communication |
+
 ---
 
 ## Requirements
@@ -182,6 +192,11 @@ Phone_log/
 ├── analytics.py          # Call statistics and analytics
 ├── export.py             # Export/import functionality (CSV, JSON, HTML)
 ├── web_app.py            # Flask web server with API endpoints
+├── llm_integration.py    # LLM integration (OpenAI/Claude/Local)
+├── semantic_memory.py    # Long-term semantic memory storage
+├── emotion_detection.py  # Sentiment analysis and emotion detection
+├── dialog_manager.py     # Multi-turn dialog with slot filling
+├── voice_streaming.py    # WebSocket voice streaming support
 ├── templates/
 │   └── index.html        # Web interface HTML
 ├── static/
@@ -197,7 +212,11 @@ Phone_log/
 │   ├── test_voice_config.py # Tests for voice configuration
 │   ├── test_analytics.py # Tests for analytics module
 │   ├── test_export.py    # Tests for export/import
-│   └── test_web_app.py   # Integration tests for web API
+│   ├── test_web_app.py   # Integration tests for web API
+│   ├── test_llm_integration.py # Tests for LLM integration
+│   ├── test_semantic_memory.py # Tests for semantic memory
+│   ├── test_emotion_detection.py # Tests for emotion detection
+│   └── test_dialog_manager.py # Tests for dialog manager
 ├── .github/
 │   └── workflows/
 │       └── ci.yml        # GitHub Actions CI/CD pipeline
@@ -205,6 +224,60 @@ Phone_log/
 ├── assistant_identity.json  # Assistant customization (git-ignored)
 ├── render.yaml           # Render deployment configuration
 └── README.md
+```
+
+---
+
+## AI Enhancement Details
+
+### LLM Integration
+
+Configure an LLM provider for advanced intent understanding:
+
+```python
+# Via API
+PUT /api/ai/llm/config
+{
+  "provider": "openai",  # or "anthropic", "local"
+  "api_key": "your-api-key",
+  "model": "gpt-3.5-turbo"
+}
+```
+
+### Semantic Memory
+
+Store and retrieve facts from conversations:
+
+```python
+# Add a memory
+POST /api/ai/memory
+{ "content": "User prefers morning calls", "type": "preference", "tags": ["schedule"] }
+
+# Search memories
+GET /api/ai/memory?q=morning
+```
+
+### Emotion Detection
+
+Analyze emotional content in messages:
+
+```python
+POST /api/ai/emotion
+{ "text": "I'm so frustrated with this!" }
+# Returns: { "emotion": "frustrated", "sentiment": "negative", ... }
+```
+
+### Multi-turn Dialog
+
+Handle complex multi-step conversations:
+
+```python
+# Start a dialog flow
+POST /api/ai/dialog/start/add_call
+
+# Process user input
+POST /api/ai/dialog/input
+{ "input": "Alice Johnson" }
 ```
 
 ---
